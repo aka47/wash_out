@@ -76,7 +76,7 @@ module WashOut
       @namespace = soap_config.namespace
       @name      = controller_path
 
-      render :template => "wash_out/#{soap_config.wsdl_style}/wsdl", :layout => false,
+      render :template => "wash_out/#{soap_config.wsdl_style}/wsdl", :layout => nil,
              :content_type => 'text/xml'
     end
 
@@ -138,7 +138,7 @@ module WashOut
       end
 
       render :template => "wash_out/#{soap_config.wsdl_style}/response",
-             :layout => false,
+             :layout => nil,
              :locals => {
                :header => header.present? ? inject.call(header, @action_spec[:header_out])
                                       : nil,
@@ -168,7 +168,7 @@ module WashOut
     # exception from a rescue_from handler. Hence this function is a public API.
     def render_soap_error(message, code=nil)
       render :template => "wash_out/#{soap_config.wsdl_style}/error", :status => 500,
-             :layout => false,
+             :layout => nil,
              :locals => { :error_message => message, :error_code => (code || 'Server') },
              :content_type => 'text/xml'
     end
