@@ -31,6 +31,8 @@ module WashOut
     end
 
     def _map_soap_parameters
+      raise "Cannot find SOAP action mapping for #{request.env['wash_out.soap_action']}" if action_spec.nil?
+
       self.params = _load_params action_spec[:in],
         _strip_empty_nodes(action_spec[:in], xml_data)
     end
