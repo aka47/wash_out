@@ -74,9 +74,10 @@ module WashOut
 
     # This action generates the WSDL for defined SOAP methods.
     def _generate_wsdl
-      @map       = self.class.soap_actions
-      @namespace = soap_config.namespace
-      @name      = controller_path
+      @map          = self.class.soap_actions
+      @namespace    = soap_config.namespace
+      @name         = controller_path
+      @service_name = soap_config.service_name
 
       render :template => "wash_out/#{soap_config.wsdl_style}/wsdl", :layout => nil,
              :content_type => 'text/xml'
@@ -194,7 +195,12 @@ module WashOut
       controller.send :"before_#{entity}", :_authenticate_wsse,   :if => :soap_action?
       controller.send :"before_#{entity}", :_map_soap_parameters, :if => :soap_action?
       controller.send :"before_#{entity}", :_map_soap_headers, :if => :soap_action?
-      controller.send :"skip_before_#{entity}", :verify_authenticity_token, :raise => false
+
+      if defined?(Rails::VERSION::MAJOR) && (Rails::VERSION::MAJOR >= 5)
+        controller.send :"skip_before_#{entity}", :verify_authenticity_token, :raise => false
+      else
+        controller.send :"skip_before_#{entity}", :verify_authenticity_token
+      end
     end
 
     def self.deep_select(collection, result=[], &blk)

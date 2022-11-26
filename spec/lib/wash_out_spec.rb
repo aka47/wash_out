@@ -2,6 +2,29 @@
 
 require 'spec_helper'
 
+SIMPLE_REQUEST_XML = <<-SIMPLE_REQUEST_XML_HEREDOC
+<?xml version="1.0" encoding="UTF-8"?>
+<env:Envelope xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:tns="false" xmlns:env="http://schemas.xmlsoap.org/soap/envelope/">
+  <env:Body>
+    <tns:answer>
+      <value>42</value>
+    </tns:answer>
+  </env:Body>
+</env:Envelope>
+SIMPLE_REQUEST_XML_HEREDOC
+
+SIMPLE_RESPONSE_XML = <<-SIMPLE_RESPONSE_XML_HEREDOC
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:tns="false">
+  <soap:Body>
+    <tns:answerResponse>
+      <Value xsi:type="xsd:int">42</Value>
+    </tns:answerResponse>
+  </soap:Body>
+</soap:Envelope>
+SIMPLE_RESPONSE_XML_HEREDOC
+
+
 describe WashOut do
 
   let :nori do
@@ -96,6 +119,40 @@ describe WashOut do
     end
   end
 
+  describe 'WSDL' do
+    let :wsdl do
+      mock_controller
+
+      HTTPI.get('http://app/route/api/wsdl').body
+    end
+
+    let :xml do
+      nori.parse wsdl
+    end
+
+    it "defines a default service name as 'service'" do
+      service_name = xml[:definitions][:service][:@name]
+      expect(service_name).to match 'service'
+    end
+  end
+
+  describe 'WSDL' do
+    let :wsdl do
+      mock_controller service_name: 'CustomServiceName'
+
+      HTTPI.get('http://app/route/api/wsdl').body
+    end
+
+    let :xml do
+      nori.parse wsdl
+    end
+
+    it 'allows to define a custom service name' do
+      service_name = xml[:definitions][:service][:@name]
+      expect(service_name).to match 'CustomServiceName'
+    end
+  end
+
   describe "Dispatcher" do
 
     context "simple actions" do
@@ -159,6 +216,25 @@ describe WashOut do
   </soap:Body>
 </soap:Envelope>
         XML
+      end
+
+      it "succeeds when protect_from_forgery is enabled" do
+
+        # Enable allow_forgery_protection (affects all subsequent specs)
+        # Alternatively, assign in spec/dummy/config/environments/test.rb
+        Rails.application.config.after_initialize do
+          ActionController::Base.allow_forgery_protection = true
+        end
+
+        mock_controller do
+          soap_action "answer", :args => nil, :return => :int
+          def answer
+            render :soap => "42"
+          end
+        end
+
+        expect(HTTPI.post("http://app/route/api/action", SIMPLE_REQUEST_XML).body).to eq SIMPLE_RESPONSE_XML
+
       end
 
       it "accept no parameters" do
@@ -961,8 +1037,10 @@ describe WashOut do
 
     it "handles auth callback" do
       mock_controller(
-        wsse_auth_callback: lambda {|user, password|
-          return user == "gorilla" && password == "secret"
+        wsse_auth_callback: lambda {|user, password, nonce, timestamp|
+          authenticated = nonce ? WashOut::Wsse.matches_expected_digest?("secret", password, nonce, timestamp) : password == "secret"
+
+          return user == "gorilla" && authenticated
         }
       ) do
         soap_action "checkAuth", :args => :integer, :return => :boolean, :to => 'check_auth'
@@ -977,7 +1055,7 @@ describe WashOut do
 
       # correct digest auth
       expect { savon(:check_auth, 42){ wsse_auth "gorilla", "secret", :digest } }.
-        to raise_exception(Savon::SOAPFault)
+        not_to raise_exception
 
       # wrong user
       expect { savon(:check_auth, 42){ wsse_auth "chimpanzee", "secret", :digest } }.
