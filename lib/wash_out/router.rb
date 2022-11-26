@@ -23,12 +23,14 @@ module WashOut
     def self.url(request, controller_name)
       lookup_soap_routes(controller_name, Rails.application.routes.routes) do |routes|
 
-        path = if routes.first.respond_to?(:optimized_path)      # Rails 4
+        path = if routes.first.respond_to?(:optimized_path)                                 # Rails 4
+          # this is NOT always true for Rails 4
           routes.map(&:optimized_path)
-        elsif routes.first.path.respond_to?(:build_formatter)    # Rails 5
+        elsif routes.first.path.respond_to?(:build_formatter) && !(Rails.version =~ /^4/ )  # Rails 5
+          # we do NOT want to accidentally end up here for Rails 4.2, therefore we check for Rails version as well
           routes.map{|x| x.path.build_formatter.evaluate(nil)}
         else
-          routes.map{|x| x.format({})}                           # Rails 3.2
+          routes.map{|x| x.format({})}                                                      # Rails 3.2
         end
 
         if Rails.application.config.relative_url_root.present?
