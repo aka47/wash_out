@@ -28,7 +28,7 @@ module WashOut
           routes.map(&:optimized_path)
         elsif routes.first.path.respond_to?(:build_formatter) && !(Rails.version =~ /^4/ )  # Rails 5
           # we do NOT want to accidentally end up here for Rails 4.2, therefore we check for Rails version as well
-          routes.map{|x| x.path.build_formatter.evaluate(nil)}
+          routes.map{|x| x.path.build_formatter.evaluate({})}
         else
           routes.map{|x| x.format({})}                                                      # Rails 3.2
         end
